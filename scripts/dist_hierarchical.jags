@@ -1,0 +1,43 @@
+
+
+    model {
+
+    # ------------------------------
+    # Priors for EDR
+    # ------------------------------
+    
+    tau_median ~ dunif(0,5)
+    tau_sd ~ dunif(0,2)
+    tau_precision <- pow(tau_sd,-2)
+    
+    for (i in 1:nproj){
+      tau[i] ~ dlnorm(log(tau_median),tau_precision)
+    }
+    
+    # ------------------------------
+    # Calculate multinomial cell probabilities
+    # ------------------------------
+    
+    for (i in 1:nproj){
+    
+      for (j in 1:(nbins[i])){
+        cdf_rint[i,j] <- 1-exp(-(rint[i,j]/tau[i])^2)
+      }
+    
+      p[i,1] <- cdf_rint[i,1] - 0
+      
+      for (j in 2:(nbins[i])){
+        p[i,j] <- cdf_rint[i,j] - cdf_rint[i,j-1]
+      }
+    }
+    
+    # ------------------------------
+    # Likelihood
+    # ------------------------------
+    
+    for (i in 1:nproj){
+      Y[i,1:(nbins[i])] ~ dmulti(p[i,1:(nbins[i])],N[i])
+    }
+    
+    }
+
