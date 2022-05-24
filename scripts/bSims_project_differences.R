@@ -14,11 +14,11 @@ setwd("~/iles_ECCC/Landbirds/QPAD_simulation/scripts")
 
 tau_median <- 1
 
-nproj <- 10      # Data comes from 20 different projects
+nproj <- 10                                               # Data comes from 10 different projects
 
-density <- runif(nproj,5,20) %>% sort()                   # density of males per ha in each project
-phi <- rep(1,nproj)                                       # singing rate.  probability that event has occurred by time t = F(t) = 1-exp(-t*phi)
+density <- runif(nproj,5,20) %>% sort()                   # density of males per ha in each project (controls sample size)
 tau <- rlnorm(nproj,log(tau_median),0.3) %>% sort()       # EDR in 100m units, where probability of detection = exp(-(d/tau)^2)
+phi <- rep(1,nproj)                                       # singing rate.  probability that event has occurred by time t = F(t) = 1-exp(-t*phi)
 
 Y_list <- vector(mode = "list", length = nproj)
 D_list <- vector(mode = "list", length = nproj)
