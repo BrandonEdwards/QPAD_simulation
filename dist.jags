@@ -1,0 +1,32 @@
+
+
+    model {
+
+    # ------------------------------
+    # Prior for EDR
+    # ------------------------------
+    
+    # tau ~ dgamma(0.001,0.001)
+    tau ~ dunif(0,5)
+    
+    # ------------------------------
+    # Calculate multinomial cell probabilities
+    # ------------------------------
+    
+    for (i in 1:nbins){
+      cdf_rint[i] <- 1-exp(-(rint[i]/tau)^2)
+    }
+    
+    p[1] <- cdf_rint[1]- 0
+    for (i in 2:nbins){
+      p[i] <- cdf_rint[i] - cdf_rint[i-1]
+    }
+    
+    # ------------------------------
+    # Likelihood
+    # ------------------------------
+    
+    Y[1,1:nbins] ~ dmulti(p[],N)
+    
+    }
+

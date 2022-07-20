@@ -3,9 +3,7 @@ library(detect)
 library(Distance)
 library(ggplot2)
 
-setwd("~/iles_ECCC/Landbirds/QPAD_simulation/scripts")
-
-rm(list=ls())
+dir.create("plots")
 
 # ---------------------------------
 # Simulation parameters
@@ -13,6 +11,7 @@ rm(list=ls())
 density = 30     # density of males per ha
 phi <- 1         # singing rate.  probability that event has occurred by time t = F(t) = 1-exp(-t*phi)
 tau <- 1         # EDR in 100m units, where probability of detection = exp(-(d/tau)^2)
+n_rep <- 10
 
 tint_scenarios <- list(c(1, 2, 3, 4, 5))
 
@@ -24,8 +23,8 @@ rint_scenarios <- list(c(seq(0.25,1.5,0.25),Inf),
 
 simulation_results <- data.frame()
 
-for (sim_rep in 1:100){
-  
+for (sim_rep in 1:n_rep){
+  print(sim_rep)
   # ---------------------------------
   # Simulate landscape
   # ---------------------------------
@@ -49,8 +48,8 @@ for (sim_rep in 1:100){
   
   
   for (tint in tint_scenarios){
-    for (rint in rint_scenarios){
-      
+    for (r_index in 1:length(rint_scenarios)){
+      rint <- rint_scenarios[[r_index]]
       # ------------------------------------
       # Expected proportions in each distance bin
       # ------------------------------------
@@ -90,104 +89,19 @@ for (sim_rep in 1:100){
     }
   }
 
-  bp <- ggplot(simulation_results, aes(x = rint, y = tau_est, fill = tint))+
-    geom_boxplot()+ggtitle(max(simulation_results$sim_rep))
-  
-  print(bp)
+  if ((sim_rep %% 10000) == 0)
+  {
+    bp <- ggplot(simulation_results, aes(x = rint, y = tau_est, fill = tint))+
+      geom_boxplot()+ggtitle(max(simulation_results$sim_rep)) +
+      ylim(0.7,1.5)+
+      #theme(axis.title.x=element_blank(),axis.text.x=element_blank(),axis.ticks.x=element_blank())+
+      NULL
+    
+    png(filename = paste0("plots/",sim_rep, ".png"), width = 8, height = 6, res = 300, units = "in")
+    print(bp)
+    dev.off()    
+  }
+
   
 }
 
-
-# ---------------------------------------------------
-# Bayesian distance sampling model
-# ---------------------------------------------------
-
-library(jagsUI)
-# Model script
-sink("dist.jags")
-cat("
-
-    model {
-
-    # ------------------------------
-    # Prior for EDR
-    # ------------------------------
-    
-    # tau ~ dgamma(0.001,0.001)
-    tau ~ dunif(0,5)
-    
-    # ------------------------------
-    # Calculate multinomial cell probabilities
-    # ------------------------------
-    
-    for (i in 1:nbins){
-      cdf_rint[i] <- 1-exp(-(rint[i]/tau)^2)
-    }
-    
-    p[1] <- cdf_rint[1]- 0
-    for (i in 2:nbins){
-      p[i] <- cdf_rint[i] - cdf_rint[i-1]
-    }
-    
-    # ------------------------------
-    # Likelihood
-    # ------------------------------
-    
-    Y[1,1:nbins] ~ dmulti(p[],N)
-    
-    }
-",fill = TRUE)
-sink()
-
-rint <- c(0.5,1,1.5,Inf)
-tint <- seq(1,5)
-
-# ------------------------------------
-# Expected proportions in each distance bin
-# ------------------------------------
-
-cdf_rint <- 1-exp(-(rint/tau)^2)
-diff(c(0,cdf_rint))
-
-# ------------------------------------
-# Transcribe
-# ------------------------------------
-
-x <- bsims_transcribe(d1, tint=tint, rint=rint)
-y <- get_table(x, "removal")
-
-# ------------------------------------
-# Frequentist analysis
-# ------------------------------------
-
-# Removal model (p - detectability)
-Y = matrix(colSums(y),1)
-D = matrix(tint,1)
-fit.p <- cmulti.fit(Y,D, type = "rem")
-
-# Distance model (q - detectability)
-Y = matrix(rowSums(y),1)
-D = matrix(rint,1)
-fit.q <- cmulti.fit(Y,D, type = "dis")
-tau_est <- exp(fit.q$coef)
-
-# ------------------------------------
-# Bayesian analysis
-# ------------------------------------
-
-jags_data <- list(Y = Y,
-                  N = sum(Y),
-                  rint = rint,
-                  nbins = length(rint))
-
-out <- jags(data = jags_data,
-             model.file =  "dist.jags",
-             parameters.to.save = c("tau","cdf_rint","p_rint"),
-             inits = NULL,
-             n.chains = 3,
-             n.thin = 5,
-             n.iter = 60000,
-             n.burnin = 10000,
-             parallel = TRUE)
-
-hist(out$sims.list$tau)
